@@ -1,0 +1,3 @@
+import javascript
+import semmle.javascript.security.dataflow.UnsafeDeserializationQuery
+import utils.test.ConsistencyChecking

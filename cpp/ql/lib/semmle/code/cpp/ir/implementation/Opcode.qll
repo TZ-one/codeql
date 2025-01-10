@@ -55,6 +55,7 @@ private newtype TOpcode =
   TVariableAddress() or
   TFieldAddress() or
   TFunctionAddress() or
+  TVirtualDeleteFunctionAddress() or
   TElementsAddress() or
   TConstant() or
   TStringConstant() or
@@ -88,6 +89,7 @@ private newtype TOpcode =
   TSizedBufferMayWriteSideEffect() or
   TInitializeDynamicAllocation() or
   TChi() or
+  TUninitializedGroup() or
   TInlineAsm() or
   TUnreached() or
   TNewObj()
@@ -135,11 +137,11 @@ class Opcode extends TOpcode {
    * Holds if the instruction must have an operand with the specified `OperandTag`.
    */
   final predicate hasOperand(OperandTag tag) {
-    hasOperandInternal(tag)
+    this.hasOperandInternal(tag)
     or
-    hasAddressOperand() and tag instanceof AddressOperandTag
+    this.hasAddressOperand() and tag instanceof AddressOperandTag
     or
-    hasBufferSizeOperand() and tag instanceof BufferSizeOperandTag
+    this.hasBufferSizeOperand() and tag instanceof BufferSizeOperandTag
   }
 
   /**
@@ -888,6 +890,15 @@ module Opcode {
   }
 
   /**
+   * The `Opcode` for a `VirtualDeleteFunctionAddress`.
+   *
+   * See the `VirtualDeleteFunctionAddressInstruction` documentation for more details.
+   */
+  class VirtualDeleteFunctionAddress extends Opcode, TVirtualDeleteFunctionAddress {
+    final override string toString() { result = "VirtualDeleteFunctionAddress" }
+  }
+
+  /**
    * The `Opcode` for a `ConstantInstruction`.
    *
    * See the `ConstantInstruction` documentation for more details.
@@ -1225,6 +1236,17 @@ module Opcode {
     final override MemoryAccessKind getWriteMemoryAccess() {
       result instanceof ChiTotalMemoryAccess
     }
+  }
+
+  /**
+   * The `Opcode` for a `UninitializedGroup`.
+   *
+   * See the `UninitializedGroupInstruction` documentation for more details.
+   */
+  class UninitializedGroup extends Opcode, TUninitializedGroup {
+    final override string toString() { result = "UninitializedGroup" }
+
+    override GroupedMemoryAccess getWriteMemoryAccess() { any() }
   }
 
   /**

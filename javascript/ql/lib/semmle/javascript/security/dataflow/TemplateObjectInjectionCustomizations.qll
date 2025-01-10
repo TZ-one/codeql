@@ -34,7 +34,8 @@ module TemplateObjectInjection {
     override DataFlow::FlowLabel getAFlowLabel() { result = TaintedObject::label() }
   }
 
-  private class RemoteFlowSourceAsSource extends Source instanceof RemoteFlowSource {
+  /** An active threat-model source, considered as a flow source. */
+  private class ActiveThreatModelSourceAsSource extends Source, ActiveThreatModelSource {
     override DataFlow::FlowLabel getAFlowLabel() { result.isTaint() }
   }
 
@@ -47,7 +48,7 @@ module TemplateObjectInjection {
       exists(
         Express::RouteSetup setup, Express::RouterDefinition router, Express::RouterDefinition top
       |
-        setup.getARouteHandler() = getRouteHandler() and
+        setup.getARouteHandler() = this.getRouteHandler() and
         setup.getRouter() = router and
         top.getASubRouter*() = router and
         usesVulnerableTemplateEngine(top)

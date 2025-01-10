@@ -177,20 +177,6 @@ class Class extends UserType {
   predicate hasConstructor() { exists(this.getAConstructor()) }
 
   /**
-   * Holds if this class has a copy constructor that is either explicitly
-   * declared (though possibly `= delete`) or is auto-generated, non-trivial
-   * and called from somewhere.
-   *
-   * DEPRECATED: There is more than one reasonable definition of what it means
-   * to have a copy constructor, and we do not want to promote one particular
-   * definition by naming it with this predicate. Having a copy constructor
-   * could mean that such a member is declared or defined in the source or that
-   * it is callable by a particular caller. For C++11, there's also a question
-   * of whether to include members that are defaulted or deleted.
-   */
-  deprecated predicate hasCopyConstructor() { this.getAMemberFunction() instanceof CopyConstructor }
-
-  /**
    * Like accessOfBaseMember but returns multiple results if there are multiple
    * paths to `base` through the inheritance graph.
    */
@@ -394,9 +380,6 @@ class Class extends UserType {
    */
   predicate isPod() { is_pod_class(underlyingElement(this)) }
 
-  /** DEPRECATED: Alias for isPod */
-  deprecated predicate isPOD() { this.isPod() }
-
   /**
    * Holds if this class, struct or union is a standard-layout class
    * [N4140 9(7)]. Also holds for structs in C programs.
@@ -587,10 +570,13 @@ class Class extends UserType {
   /**
    * Holds if this class, struct or union is constructed from another class as
    * a result of template instantiation. It originates either from a class
-   * template or from a class nested in a class template.
+   * template, a class nested in a class template, or a template template
+   * parameter.
    */
-  predicate isConstructedFrom(Class c) {
-    class_instantiation(underlyingElement(this), unresolveElement(c))
+  predicate isConstructedFrom(UserType t) {
+    class_instantiation(underlyingElement(this), unresolveElement(t))
+    or
+    template_template_instantiation(underlyingElement(this), unresolveElement(t))
   }
 
   /**
@@ -969,7 +955,7 @@ class ClassTemplateSpecialization extends Class {
     result.getNamespace() = this.getNamespace() and
     // It is distinguished by the fact that each of its template arguments
     // is a distinct template parameter.
-    count(TemplateParameter tp | tp = result.getATemplateArgument()) =
+    count(TemplateParameterBase tp | tp = result.getATemplateArgument()) =
       count(int i | exists(result.getTemplateArgument(i)))
   }
 
@@ -1023,7 +1009,7 @@ private predicate isPartialClassTemplateSpecialization(Class c) {
    */
 
   exists(Type ta | ta = c.getATemplateArgument() and ta.involvesTemplateParameter()) and
-  count(TemplateParameter tp | tp = c.getATemplateArgument()) !=
+  count(TemplateParameterBase tp | tp = c.getATemplateArgument()) !=
     count(int i | exists(c.getTemplateArgument(i)))
 }
 
@@ -1108,7 +1094,7 @@ class ProxyClass extends UserType {
   override Location getLocation() { result = this.getTemplateParameter().getDefinitionLocation() }
 
   /** Gets the template parameter for which this is the proxy class. */
-  TemplateParameter getTemplateParameter() {
+  TypeTemplateParameter getTemplateParameter() {
     is_proxy_class_for(underlyingElement(this), unresolveElement(result))
   }
 }

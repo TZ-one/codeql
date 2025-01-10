@@ -25,11 +25,7 @@ class Configuration extends TaintTracking::Configuration {
     isIndirectCommandArgument(sink, highlight)
   }
 
-  override predicate isSink(DataFlow::Node sink) { isSinkWithHighlight(sink, _) }
+  override predicate isSink(DataFlow::Node sink) { this.isSinkWithHighlight(sink, _) }
 
   override predicate isSanitizer(DataFlow::Node node) { node instanceof Sanitizer }
-
-  override predicate isAdditionalTaintStep(DataFlow::Node pred, DataFlow::Node succ) {
-    argsParseStep(pred, succ)
-  }
 }
