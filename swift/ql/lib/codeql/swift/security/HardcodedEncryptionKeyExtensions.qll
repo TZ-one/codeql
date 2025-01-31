@@ -5,6 +5,7 @@
 
 import swift
 import codeql.swift.dataflow.DataFlow
+import codeql.swift.dataflow.ExternalFlow
 
 /**
  * A dataflow sink for hard-coded encryption key vulnerabilities. That is,
@@ -13,16 +14,16 @@ import codeql.swift.dataflow.DataFlow
 abstract class HardcodedEncryptionKeySink extends DataFlow::Node { }
 
 /**
- * A sanitizer for hard-coded encryption key vulnerabilities.
+ * A barrier for hard-coded encryption key vulnerabilities.
  */
-abstract class HardcodedEncryptionKeySanitizer extends DataFlow::Node { }
+abstract class HardcodedEncryptionKeyBarrier extends DataFlow::Node { }
 
 /**
- * A unit class for adding additional taint steps.
+ * A unit class for adding additional flow steps.
  */
-class HardcodedEncryptionKeyAdditionalTaintStep extends Unit {
+class HardcodedEncryptionKeyAdditionalFlowStep extends Unit {
   /**
-   * Holds if the step from `node1` to `node2` should be considered a taint
+   * Holds if the step from `node1` to `node2` should be considered a flow
    * step for paths related to hard-coded encryption key vulnerabilities.
    */
   abstract predicate step(DataFlow::Node nodeFrom, DataFlow::Node nodeTo);
@@ -34,14 +35,11 @@ class HardcodedEncryptionKeyAdditionalTaintStep extends Unit {
 private class CryptoSwiftEncryptionKeySink extends HardcodedEncryptionKeySink {
   CryptoSwiftEncryptionKeySink() {
     // `key` arg in `init` is a sink
-    exists(CallExpr call, string fName |
-      call.getStaticTarget()
-          .(MethodDecl)
-          .hasQualifiedName([
-              "AES", "HMAC", "ChaCha20", "CBCMAC", "CMAC", "Poly1305", "Blowfish", "Rabbit"
-            ], fName) and
-      fName.matches("init(key:%") and
-      call.getArgument(0).getExpr() = this.asExpr()
+    exists(NominalTypeDecl c, Initializer f, CallExpr call |
+      c.getName() = ["AES", "HMAC", "ChaCha20", "CBCMAC", "CMAC", "Poly1305", "Blowfish", "Rabbit"] and
+      c.getAMember() = f and
+      call.getStaticTarget() = f and
+      call.getArgumentWithLabel("key").getExpr() = this.asExpr()
     )
   }
 }
@@ -51,11 +49,48 @@ private class CryptoSwiftEncryptionKeySink extends HardcodedEncryptionKeySink {
  */
 private class RnCryptorEncryptionKeySink extends HardcodedEncryptionKeySink {
   RnCryptorEncryptionKeySink() {
-    exists(ClassOrStructDecl c, MethodDecl f, CallExpr call |
-      c.getFullName() = ["RNCryptor", "RNEncryptor", "RNDecryptor"] and
+    exists(NominalTypeDecl c, Method f, CallExpr call |
+      c.getFullName() =
+        [
+          "RNCryptor", "RNEncryptor", "RNDecryptor", "RNCryptor.EncryptorV3",
+          "RNCryptor.DecryptorV3"
+        ] and
       c.getAMember() = f and
       call.getStaticTarget() = f and
-      call.getArgumentWithLabel(["encryptionKey", "withEncryptionKey"]).getExpr() = this.asExpr()
+      call.getArgumentWithLabel(["encryptionKey", "withEncryptionKey", "hmacKey"]).getExpr() =
+        this.asExpr()
     )
   }
+}
+
+private class EncryptionKeySinks extends SinkModelCsv {
+  override predicate row(string row) {
+    row =
+      [
+        // Realm database library.
+        ";Realm.Configuration;true;init(fileURL:inMemoryIdentifier:syncConfiguration:encryptionKey:readOnly:schemaVersion:migrationBlock:deleteRealmIfMigrationNeeded:shouldCompactOnLaunch:objectTypes:);;;Argument[3];encryption-key",
+        ";Realm.Configuration;true;init(fileURL:inMemoryIdentifier:syncConfiguration:encryptionKey:readOnly:schemaVersion:migrationBlock:deleteRealmIfMigrationNeeded:shouldCompactOnLaunch:objectTypes:seedFilePath:);;;Argument[3];encryption-key",
+        ";Realm.Configuration;true;encryptionKey;;;PostUpdate;encryption-key",
+        // sqlite3 C API (Encryption Extension)
+        ";;false;sqlite3_key(_:_:_:);;;Argument[1];encryption-key",
+        ";;false;sqlite3_rekey(_:_:_:);;;Argument[1];encryption-key",
+        ";;false;sqlite3_key_v2(_:_:_:_:);;;Argument[2];encryption-key",
+        ";;false;sqlite3_rekey_v2(_:_:_:_:);;;Argument[2];encryption-key",
+        // SQLite.swift
+        ";Connection;true;key(_:db:);;;Argument[0];encryption-key",
+        ";Connection;true;keyAndMigrate(_:db:);;;Argument[0];encryption-key",
+        ";Connection;true;rekey(_:db:);;;Argument[0];encryption-key",
+        ";Connection;true;sqlcipher_export(_:key:);;;Argument[1];encryption-key",
+        // GRDB
+        ";Database;true;usePassphrase(_:);;;Argument[0];encryption-key",
+        ";Database;true;changePassphrase(_:);;;Argument[0];encryption-key",
+      ]
+  }
+}
+
+/**
+ * A sink defined in a CSV model.
+ */
+private class DefaultEncryptionKeySink extends HardcodedEncryptionKeySink {
+  DefaultEncryptionKeySink() { sinkNode(this, "encryption-key") }
 }
